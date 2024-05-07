@@ -27,9 +27,12 @@ class BitVectorCandidate(Candidate):
         candidate = np.random.choice(a=[True,False], size=size, replace=True)
         return BitVectorCandidate(size, candidate, p, uniform)
 
-    def mutate(self) -> BitVectorCandidate:
-        candidate = np.array([v if np.random.rand() >= self.p else bool(1-v) for v in self.candidate])
-        return BitVectorCandidate(self.size, candidate, self.p, self.uniform)
+    def mutate(self) -> 'BitVectorCandidate':
+        #invertito il segno per la probabilita`
+        #utilizzato lo XOR per invertire il bit in caso di mutazione
+        mutation_arr = np.random.rand(self.size) < self.p
+        mutated_candidate = np.logical_xor(self.candidate, mutation_arr)
+        return BitVectorCandidate(self.size, mutated_candidate, self.p, self.uniform)
     
     def recombine(self, c: BitVectorCandidate) -> BitVectorCandidate:
         if self.uniform:
@@ -38,11 +41,12 @@ class BitVectorCandidate(Candidate):
             return self.recombine_single_point(c)
 
     def recombine_single_point(self, c: BitVectorCandidate) -> BitVectorCandidate:
-        idx = np.random.choice(range(self.size))
-        candidate = np.empty(np.max([self.size, c.size]), dtype=bool)
-        candidate[:idx] = self.candidate[:idx]
-        candidate[idx:] = c.candidate[idx:]
-        return BitVectorCandidate(self.candidate.shape[0], candidate, self.p, self.uniform)
+        #modificato leggeremente il processo di ricombinazione permettendo una combinazione
+        #anche alternata dai due elementi.
+        #inoltre e` stata migliorata l'efficenza
+        mask = np.random.rand(self.size) < 0.5
+        new_candidate = np.where(mask, self.candidate, c.candidate)
+        return BitVectorCandidate(self.size, new_candidate, self.p, self.uniform)
     
     def recombine_uniform(self, c: BitVectorCandidate) -> BitVectorCandidate:
         candidate = np.empty(np.min([self.size, c.size]), dtype=bool)
