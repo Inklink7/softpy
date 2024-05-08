@@ -41,20 +41,16 @@ class BitVectorCandidate(Candidate):
             return self.recombine_single_point(c)
 
     def recombine_single_point(self, c: BitVectorCandidate) -> BitVectorCandidate:
-        #modificato leggeremente il processo di ricombinazione permettendo una combinazione
-        #anche alternata dai due elementi.
-        #inoltre e` stata migliorata l'efficenza
+        idx = np.random.randint(self.size)
+        candidate = np.empty(self.size, dtype=bool)
+        candidate[:idx] = self.candidate[:idx]
+        candidate[idx:] = c.candidate[idx:]
+        return BitVectorCandidate(self.size, candidate, self.p, self.uniform)      
+    
+    def recombine_uniform(self, c: BitVectorCandidate) -> BitVectorCandidate:
         mask = np.random.rand(self.size) < 0.5
         new_candidate = np.where(mask, self.candidate, c.candidate)
         return BitVectorCandidate(self.size, new_candidate, self.p, self.uniform)
-    
-    def recombine_uniform(self, c: BitVectorCandidate) -> BitVectorCandidate:
-        candidate = np.empty(np.min([self.size, c.size]), dtype=bool)
-        for i in range(len(candidate)):
-            if np.random.rand() < 0.5:
-                candidate[i] = self.candidate[i]
-            else:
-                candidate[i] = c.candidate[i]
 
 
 
