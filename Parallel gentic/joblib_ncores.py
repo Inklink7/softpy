@@ -6,6 +6,8 @@ import time
 #from multiprocessing import Queue
 from joblib import Parallel, delayed
 import multiprocessing
+import os
+
 
 class GeneticAlgorithm(MetaHeuristicsAlgorithm):
     '''
@@ -44,63 +46,57 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
         #manager = multiprocessing.Manager()
         #shared_q = manager.list([None] * self.pop_size)
         #result_queue = Queue()
-        n_cores = 1
+        n_cores = 4
         init_time = time.time()
-        for it in range(n_iters+1):
-            iter_start = time.time()
-            if show_iters:
-                print(it)
-            self.fitness = np.vectorize(self.fitness_func)(self.population) #crea un vettore a cui applica per ogni elemento di population la funzione fitness
-            v = np.max(self.fitness)
-            self.best = self.population[np.argmax(self.fitness)] if v > self.fitness_best else self.best
-            self.fitness_best = v if v > self.fitness_best else self.fitness_best
+        elab_tot = int(self.pop_size-self.n_elite)/2
+        elab_thread = self.divide_number(elab_tot, n_cores)
+        with Parallel(n_jobs = n_cores) as parallel:
+            for it in range(n_iters+1):
+                iter_start = time.time()
+                if show_iters:
+                    print(it)
+                self.fitness = np.vectorize(self.fitness_func)(self.population) #crea un vettore a cui applica per ogni elemento di population la funzione fitness
+                v = np.max(self.fitness)
+                self.best = self.population[np.argmax(self.fitness)] if v > self.fitness_best else self.best
+                self.fitness_best = v if v > self.fitness_best else self.fitness_best
 
-            if keep_history:
-                self.best_h[it] = self.best
-                self.fitness_h[it] = self.fitness_best
+                if keep_history:
+                    self.best_h[it] = self.best
+                    self.fitness_h[it] = self.fitness_best
 
-            q = np.empty(self.pop_size, dtype=self.candidate_type)
-            if self.elitism:
-                q[:self.n_elite] = self.population[np.argsort(self.fitness)[::-1][:self.n_elite]]
+                q = np.empty(self.pop_size, dtype=self.candidate_type)
+                if self.elitism:
+                    q[:self.n_elite] = self.population[np.argsort(self.fitness)[::-1][:self.n_elite]]
+                    
+                #listaTest = list(shared_q)
                 
-            #listaTest = list(shared_q)
-            
-            i = self.n_elite if self.elitism else 0
-            sub = self.n_elite if self.elitism else 0
-            current_step = None
+                i = self.n_elite if self.elitism else 0
+                sub = self.n_elite if self.elitism else 0
+                current_step = None
 
-            idx = np.random.permutation(range(len(self.fitness)))
-            self.population = self.population[idx]
-            self.fitness = self.fitness[idx]
-            
-            
-            selection_time = 0
-            elaboration_time = 0
-            
-            elab_tot = int(self.pop_size-sub)/2
-            elab_thread = self.divide_number(elab_tot, n_cores)
-            thread_pkg = []
-            for n in elab_thread:
-                thread_pkg.append((i, n))
-            s1_time = time.time()
-            #pop_step = int((pop_max-i)/n_cores)
-            results = Parallel(n_jobs=n_cores, prefer="threads")(delayed(self.calculateGeneration)(*thread_pkg[k]) for k in range (int(n_cores)))
-            s2_time = time.time()
-            calctime = 0
-            for (calctime_th, thread_results) in results:
-                calctime += calctime_th
-                for candidate in thread_results:
-                    q[i] = candidate
-                    i += 1
-            
-            #listaTest = list(shared_q)
-            self.population = q
-            s3_time = time.time()
-            profile_arr.append([s1_time - iter_start, s2_time-s1_time, calctime])
+                idx = np.random.permutation(range(len(self.fitness)))
+                self.population = self.population[idx]
+                self.fitness = self.fitness[idx]
+
+                #thread_pkg = []
+                #for n in elab_thread:
+                #    thread_pkg.append((i, n))
+                s1_time = time.time()
+                #pop_step = int((pop_max-i)/n_cores)
+                
+                results = parallel(delayed(self.calculate_generation)(elab_thread[k]) for k in range (int(n_cores)))
+                s2_time = time.time()
+                print("----- Iterazione "+str(it)+" -----")
+                q[sub:] = np.concatenate(results)
+                
+                #listaTest = list(shared_q)
+                self.population = q
+                s3_time = time.time()
+                profile_arr.append([s1_time - iter_start, s2_time-s1_time, 0])
 
         return self.best, profile_arr, init_time-start_time
     
-    def calculateGeneration(self, index, iterations):
+    def calculate_generation(self, iterations):
         t1 = time.time()
         list = []
         for j in range (int(iterations)):  
@@ -111,7 +107,8 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
             list.append(p1.recombine(p2).mutate())
             list.append(p2.recombine(p1).mutate())    
         t2 = time.time()
-        return t2-t1, list
+        print(str(os.getpid()) + " " + str(iterations))
+        return list
     
     
     def divide_number(self, num, parts):
@@ -196,7 +193,3 @@ class SteadyStateGeneticAlgorithm(MetaHeuristicsAlgorithm):
             self.population[die[1]] = c2
 
         return self.best
-    
-
-
-
