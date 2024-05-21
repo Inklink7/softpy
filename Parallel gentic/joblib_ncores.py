@@ -46,7 +46,6 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
         #manager = multiprocessing.Manager()
         #shared_q = manager.list([None] * self.pop_size)
         #result_queue = Queue()
-        n_cores = 4
         init_time = time.time()
         elab_tot = int(self.pop_size-self.n_elite)/2
         elab_thread = self.divide_number(elab_tot, n_cores)
