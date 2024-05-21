@@ -27,7 +27,7 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
         self.elitism = elitism
         self.n_elite = n_elite
 
-    def fit(self, n_iters=10, keep_history=False, show_iters=False): 
+    def fit(self, n_iters=10, keep_history=False, show_iters=False, n_cores=1): 
         start_time = time.time()
         if self.elitism and (self.pop_size + self.n_elite)%2 != 0:
             self.pop_size += 1
