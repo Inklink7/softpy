@@ -7,6 +7,7 @@ import time
 from joblib import Parallel, delayed
 import multiprocessing
 import os
+import gc
 
 
 class GeneticAlgorithm(MetaHeuristicsAlgorithm):
@@ -49,7 +50,7 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
         init_time = time.time()
         elab_tot = int(self.pop_size-self.n_elite)/2
         elab_thread = self.divide_number(elab_tot, n_cores)
-        with Parallel(n_jobs = n_cores) as parallel:
+        with Parallel(n_jobs = n_cores, backend='loky') as parallel:
             for it in range(n_iters+1):
                 iter_start = time.time()
                 if show_iters:
@@ -87,7 +88,7 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
                 s2_time = time.time()
                 print("----- Iterazione "+str(it)+" -----")
                 q[sub:] = np.concatenate(results)
-                
+                gc.collect()
                 #listaTest = list(shared_q)
                 self.population = q
                 s3_time = time.time()
@@ -95,8 +96,9 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
 
         return self.best, profile_arr, init_time-start_time
     
+    #@profile
     def calculate_generation(self, iterations):
-        t1 = time.time()
+        gc.collect()
         list = []
         for j in range (int(iterations)):  
             px1, current_step = self.selection_func(self.fitness)
@@ -105,8 +107,9 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
             p2 = self.population[px2]
             list.append(p1.recombine(p2).mutate())
             list.append(p2.recombine(p1).mutate())    
-        t2 = time.time()
+        
         print(str(os.getpid()) + " " + str(iterations))
+        
         return list
     
     
@@ -192,3 +195,7 @@ class SteadyStateGeneticAlgorithm(MetaHeuristicsAlgorithm):
             self.population[die[1]] = c2
 
         return self.best
+    
+
+
+
