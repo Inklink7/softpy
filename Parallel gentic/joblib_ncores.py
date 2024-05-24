@@ -2,13 +2,31 @@ from __future__ import annotations
 import numpy as np
 from softpy.evolutionary.singlestate import MetaHeuristicsAlgorithm
 import time
-#import multiprocessing
-#from multiprocessing import Queue
 from joblib import Parallel, delayed
-import multiprocessing
-import os
 import gc
+import os
+import pickle
 
+
+def calculate_generation(iterations, sel):
+        t1 = time.time()
+
+        with open('pop.pkl', 'rb') as f:
+            pop = pickle.load(f)
+        with open('fit.pkl', 'rb') as f:
+            fit = pickle.load(f)
+        
+        list = []
+        for j in range (int(iterations)):  
+            px1, current_step = sel(fit)
+            p1 = pop[px1]
+            px2, current_step = sel(fit)
+            p2 = pop[px2]
+            list.append(p1.recombine(p2).mutate())
+            list.append(p2.recombine(p1).mutate())    
+        t2 = time.time()
+        print(str(os.getpid()) + " " + str(iterations))
+        return list
 
 class GeneticAlgorithm(MetaHeuristicsAlgorithm):
     '''
@@ -44,13 +62,11 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
             self.fitness_h[:] = np.NINF
         profile_arr = []
 
-        #manager = multiprocessing.Manager()
-        #shared_q = manager.list([None] * self.pop_size)
-        #result_queue = Queue()
         init_time = time.time()
         elab_tot = int(self.pop_size-self.n_elite)/2
         elab_thread = self.divide_number(elab_tot, n_cores)
-        with Parallel(n_jobs = n_cores, backend='loky') as parallel:
+                
+        with Parallel(n_jobs = n_cores) as parallel:
             for it in range(n_iters+1):
                 iter_start = time.time()
                 if show_iters:
@@ -67,8 +83,6 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
                 q = np.empty(self.pop_size, dtype=self.candidate_type)
                 if self.elitism:
                     q[:self.n_elite] = self.population[np.argsort(self.fitness)[::-1][:self.n_elite]]
-                    
-                #listaTest = list(shared_q)
                 
                 i = self.n_elite if self.elitism else 0
                 sub = self.n_elite if self.elitism else 0
@@ -78,41 +92,31 @@ class GeneticAlgorithm(MetaHeuristicsAlgorithm):
                 self.population = self.population[idx]
                 self.fitness = self.fitness[idx]
 
-                #thread_pkg = []
-                #for n in elab_thread:
-                #    thread_pkg.append((i, n))
-                s1_time = time.time()
-                #pop_step = int((pop_max-i)/n_cores)
                 
-                results = parallel(delayed(self.calculate_generation)(elab_thread[k]) for k in range (int(n_cores)))
+                with open('pop.pkl', 'wb') as f:
+                    pickle.dump(self.population, f)
+                with open('fit.pkl', 'wb') as f:
+                    pickle.dump(self.fitness, f)
+
+
+                s1_time = time.time()
+                                
+                results = parallel(delayed(calculate_generation)(elab_thread[k], self.selection_func) for k in range (int(n_cores)))
+
                 s2_time = time.time()
                 print("----- Iterazione "+str(it)+" -----")
+                
                 q[sub:] = np.concatenate(results)
-                gc.collect()
-                #listaTest = list(shared_q)
+                
                 self.population = q
-                s3_time = time.time()
+
+                gc.collect()
+                
                 profile_arr.append([s1_time - iter_start, s2_time-s1_time, 0])
 
         return self.best, profile_arr, init_time-start_time
     
-    #@profile
-    def calculate_generation(self, iterations):
-        gc.collect()
-        list = []
-        for j in range (int(iterations)):  
-            px1, current_step = self.selection_func(self.fitness)
-            p1 = self.population[px1]
-            px2, current_step = self.selection_func(self.fitness)
-            p2 = self.population[px2]
-            list.append(p1.recombine(p2).mutate())
-            list.append(p2.recombine(p1).mutate())    
-        
-        print(str(os.getpid()) + " " + str(iterations))
-        
-        return list
-    
-    
+
     def divide_number(self, num, parts):
         part_size = num // parts
     
@@ -195,7 +199,3 @@ class SteadyStateGeneticAlgorithm(MetaHeuristicsAlgorithm):
             self.population[die[1]] = c2
 
         return self.best
-    
-
-
-
